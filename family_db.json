@@ -1,0 +1,106 @@
+{
+  "schema_version": "1.0",
+  "family_profile": {
+    "family_name": "Zeng Family",
+    "home_base": {
+      "city": "Newcastle",
+      "country": "USA",
+      "airport_code": "SEA"
+    },
+    "members": [
+      {
+        "id": "grandma_01",
+        "role": "grandparent",
+        "age_range": "80-90",
+        "language": "Mandarin",
+        "english_fluency": "none",
+        "mobility": {
+          "level": "low",
+          "max_walking_km_per_day": 1.5,
+          "requires_rest_stops_every_min": 45,
+          "needs_elevator_access": true,
+          "wheelchair_assist": false
+        },
+        "climate_preference": {
+          "min_temp_f": 60,
+          "max_temp_f": 85,
+          "avoid_humidity_above_pct": 80
+        },
+        "tour_requirements": {
+          "language_required": ["Mandarin", "Bilingual"],
+          "reject_english_only_tours": true
+        }
+      },
+      {
+        "id": "grandpa_01",
+        "role": "grandparent",
+        "age_range": "80-90",
+        "language": "Mandarin",
+        "english_fluency": "basic",
+        "mobility": {
+          "level": "low",
+          "max_walking_km_per_day": 1.5,
+          "requires_rest_stops_every_min": 45,
+          "needs_elevator_access": true,
+          "wheelchair_assist": false
+        },
+        "climate_preference": {
+          "min_temp_f": 60,
+          "max_temp_f": 85,
+          "avoid_humidity_above_pct": 80
+        },
+        "tour_requirements": {
+          "language_required": ["Mandarin", "Bilingual"],
+          "reject_english_only_tours": true
+        }
+      },
+      {
+        "id": "parent_01",
+        "role": "adult_child",
+        "age_range": "50-60",
+        "language": "English",
+        "english_fluency": "native",
+        "mobility": { "level": "high" },
+        "tour_requirements": { "language_required": ["English", "Bilingual"] }
+      }
+    ]
+  },
+  "mobility_rules": {
+    "description": "Hard constraints applied to every itinerary candidate before it is shown to the family.",
+    "no_english_only_tours": true,
+    "max_daily_walking_km": 1.5,
+    "min_temperature_f": 60,
+    "require_elevator_or_ground_floor_lodging": true,
+    "max_flight_layovers": 1,
+    "min_layover_minutes": 90,
+    "reject_if_any_rule_violated": true
+  },
+  "budget_rules": {
+    "currency": "USD",
+    "per_trip_soft_cap": 3000,
+    "per_trip_hard_cap": 4500,
+    "roi_logic": "Approve if per-person cost-per-day stays reasonable relative to trip uniqueness/duration AND all mobility_rules are satisfiable at the destination. A cruise bundles lodging+food+transport into one fixed cost with near-zero daily walking, which is why it clears the mobility bar at a higher price. A beach destination at the same price with high heat/humidity and long transit fails the climate/mobility rule even under budget.",
+    "precedent_examples": [
+      {
+        "destination": "Danube River Cruise (Budapest-Vienna-Passau)",
+        "estimated_cost_usd": 3000,
+        "approved": true,
+        "reason": "Fixed-cost cruise, minimal daily walking, bilingual shore excursions available, temperate climate in shoulder season."
+      },
+      {
+        "destination": "Bermuda",
+        "estimated_cost_usd": 3000,
+        "approved": false,
+        "reason": "High summer humidity exceeds comfort rule, limited bilingual tour operators, long connecting flights raise layover risk."
+      }
+    ],
+    "approval_flow": "auto_approve_under_soft_cap_if_mobility_rules_pass -> flag_for_manual_review_if_between_soft_and_hard_cap -> auto_reject_above_hard_cap"
+  },
+  "visited_cities": [
+    { "city": "Vancouver", "country": "Canada", "date": "2023-08", "rating": 4, "notes": "Good bilingual tours, easy walking pace." },
+    { "city": "Kyoto", "country": "Japan", "date": "2024-04", "rating": 5, "notes": "Loved the pace; wheelchair-accessible temples appreciated." }
+  ],
+  "trip_history": [],
+  "pending_reviews": [],
+  "last_updated": null
+}

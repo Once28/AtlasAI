@@ -1,0 +1,9 @@
+---
+description: Rules for local travel agent project
+globs: *.py, *.json
+---
+- Environment: Python 3.10+, Streamlit, LangChain, Ollama (Local execution only).
+- Keep external cloud dependencies at zero cost.
+- Do NOT rewrite or delete rules inside `family_db.json`.
+- All LLM responses must strictly format travel suggestions around grandparents' mobility, warm weather (>60F), Chinese tour availability, and past visited locations.
+- Code style: Modular, clean functions, error handling around local Ollama calls.
