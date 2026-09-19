@@ -3,7 +3,9 @@ app.py — Streamlit entrypoint. Two tabs: Chat (dual-model routed) and Trip Rev
 (reads/writes family_db.json directly, no model call needed for simple edits).
 
 Run: streamlit run app.py
-Requires Ollama running locally with qwen2.5:7b and llama3.1:8b pulled.
+Requires Ollama running locally with the models set in router.py pulled
+(default: qwen2.5:7b-instruct-q4_K_M and llama3.1:8b — override via
+FAMILY_AGENT_QWEN_MODEL / FAMILY_AGENT_LLAMA_MODEL env vars).
 """
 
 import json
@@ -13,7 +15,7 @@ import streamlit as st
 
 from prompts import build_qwen_system_prompt, build_llama_system_prompt
 from router import route_and_call
-# from tools import search_flights, search_web
+from tools import search_flights, search_web, TOOL_REGISTRY
 
 DB_PATH = "family_db.json"
 
@@ -53,12 +55,39 @@ db = load_db()
 tab_chat, tab_review = st.tabs(["Plan a Trip", "Trip Review"])
 
 with tab_chat:
-    st.subheader("Ask the family travel agent")
     if "messages" not in st.session_state:
         st.session_state.messages = []
 
-    for m in st.session_state.messages:
-        st.chat_message(m["role"]).write(m["content"])
+    if not st.session_state.messages:
+        # Empty state: center a welcome header + the chat input together,
+        # Gemini-style, instead of Streamlit's default bottom-pinned input.
+        st.markdown(
+            """
+            <style>
+            [data-testid="stChatInput"] {
+                position: fixed !important;
+                bottom: auto !important;
+                top: 45% !important;
+                left: 50% !important;
+                transform: translate(-50%, -50%);
+                width: 55% !important;
+                max-width: 700px;
+            }
+            </style>
+            <div style="position: fixed; top: 30%; left: 50%; transform: translateX(-50%);
+                        text-align: center; width: 100%;">
+                <h1 style="margin-bottom: 0;">✈️ Family Travel Agent</h1>
+                <p style="color: #888;">Ask about flights, itineraries, or budget for the next family trip.</p>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+    else:
+        # Active state: normal top-to-bottom history; chat_input stays
+        # pinned at the bottom by Streamlit's default behavior.
+        st.subheader("Ask the family travel agent")
+        for m in st.session_state.messages:
+            st.chat_message(m["role"]).write(m["content"])
 
     user_input = st.chat_input("e.g. Find a warm, low-walking trip under $3000 for the grandparents")
     if user_input:
@@ -73,13 +102,29 @@ with tab_chat:
             user_input, qwen_prompt, llama_prompt,
             st.session_state.messages,
             tools=FLIGHT_TOOL_SCHEMA if wants_flights else None,
+            tool_registry=TOOL_REGISTRY,
         )
         reply = result.get("message", {}).get("content", "(no response)")
         model_used = result.get("_routed_model", "unknown")
 
         st.session_state.messages.append({"role": "assistant", "content": reply})
         st.chat_message("assistant").write(reply)
-        st.caption(f"Routed to: {model_used}")
+        st.caption(f"Routed to: {model_used}" + (" (tool calls executed)" if result.get("_warning") is None and wants_flights else ""))
+
+    with st.expander("Quick tool test (bypasses the model — calls tools.py directly)"):
+        col1, col2 = st.columns(2)
+        with col1:
+            st.caption("search_flights")
+            qo = st.text_input("Origin airport code", "SEA", key="qo")
+            qd = st.text_input("Destination airport code", "BUD", key="qd")
+            qdate = st.text_input("Depart date (YYYY-MM-DD)", key="qdate")
+            if st.button("Run search_flights"):
+                st.json(search_flights(qo, qd, qdate))
+        with col2:
+            st.caption("search_web")
+            qtext = st.text_input("Query", "Danube cruise bilingual tours", key="qtext")
+            if st.button("Run search_web"):
+                st.json(search_web(qtext))
 
 with tab_review:
     st.subheader("Trip Review — approve, reject, or log a trip")
