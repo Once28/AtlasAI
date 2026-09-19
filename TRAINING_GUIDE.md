@@ -120,7 +120,7 @@ Colab to your local machine, then:
 3. Point `router.py` at it by setting the env var before running Streamlit:
 
    ```bash
-   export FAMILY_AGENT_QWEN_MODEL=family-qwen
+   export FAMILY_AGENT_MODEL=family-qwen
    streamlit run app.py
    ```
 

@@ -16,7 +16,7 @@ import json
 import time
 
 from prompts import build_qwen_system_prompt
-from router import call_ollama, MODEL_QWEN
+from router import call_ollama, MODEL
 
 DB_PATH = "family_db.json"
 
@@ -54,7 +54,7 @@ def run_eval():
         messages = [{"role": "user", "content": prompt}]
 
         start = time.perf_counter()
-        response = call_ollama(MODEL_QWEN, system_prompt, messages)
+        response = call_ollama(MODEL, system_prompt, messages)
         elapsed_s = time.perf_counter() - start
 
         content = response.get("message", {}).get("content", "")
@@ -83,7 +83,7 @@ def run_eval():
 
 
 def print_report(results: list[dict]):
-    print(f"\n{'=' * 60}\nFamily Travel Agent — eval report ({MODEL_QWEN})\n{'=' * 60}")
+    print(f"\n{'=' * 60}\nFamily Travel Agent — eval report ({MODEL})\n{'=' * 60}")
     for r in results:
         print(f"\nPrompt: {r['prompt']}")
         print(f"  Latency: {r['latency_s']}s   Tokens/sec: {r['tokens_per_sec']}")

@@ -10,7 +10,7 @@ Install:
 """
 
 from datetime import date
-from fast_flights import FlightData, Passengers, Result, get_flights
+from fast_flights import FlightQuery, Passengers, create_query, get_flights
 from ddgs import DDGS
 
 
@@ -31,18 +31,24 @@ def search_flights(
     seniors is tracked separately so grandparent seat/aisle preferences
     can be applied downstream, but fast-flights bills them as adults.
     """
-    flight_legs = [FlightData(date=depart_date, from_airport=origin, to_airport=destination)]
+    flight_legs = [FlightQuery(date=depart_date, from_airport=origin, to_airport=destination)]
     if return_date:
-        flight_legs.append(FlightData(date=return_date, from_airport=destination, to_airport=origin))
+        flight_legs.append(FlightQuery(date=return_date, from_airport=destination, to_airport=origin))
 
     try:
-        result: Result = get_flights(
+        # fast-flights now separates query-building (create_query) from
+        # execution (get_flights) instead of taking flight_data/trip/seat/
+        # passengers directly on get_flights. Kwarg names below match the
+        # old get_flights signature 1:1 on the assumption create_query kept
+        # them — if this raises a TypeError, run `help(create_query)` and
+        # adjust the kwarg names to match.
+        query = create_query(
             flight_data=flight_legs,
             trip="round-trip" if return_date else "one-way",
             seat=seat_class,
             passengers=Passengers(adults=adults + seniors, children=0, infants_in_seat=0, infants_on_lap=0),
-            fetch_mode="fallback",  # falls back to a headless request if the fast local parser fails
         )
+        result = get_flights(query, fetch_mode="fallback")  # fallback: headless request if the fast local parser fails
     except Exception as e:
         return {"error": str(e), "flights": []}
 
@@ -89,6 +95,15 @@ def check_climate_fit(destination_query: str, min_temp_f: int = 60) -> dict:
     """
     hits = search_web(f"{destination_query} average temperature by month", max_results=3)
     return {"query": destination_query, "min_required_f": min_temp_f, "search_hits": hits}
+
+
+# Name -> callable, so router.py can dispatch a model's tool_call by name
+# without a hardcoded if/elif chain.
+TOOL_REGISTRY = {
+    "search_flights": search_flights,
+    "search_web": search_web,
+    "check_climate_fit": check_climate_fit,
+}
 
 
 if __name__ == "__main__":
