@@ -24,6 +24,7 @@ CJK_PATTERN = re.compile(r"[\u4e00-\u9fff]")
 # defaults to the smallest/fastest option. Override via env var without
 # touching code (e.g. to point at a fine-tuned model per TRAINING_GUIDE.md).
 MODEL = os.environ.get("FAMILY_AGENT_MODEL", "qwen2.5:3b")
+# MODEL = os.environ.get("FAMILY_AGENT_MODEL", "qwen3:8b")
 
 # --- Dual-model setup (commented out for future dev) -------------------
 # Re-enable this block + choose_model() below, and switch route_and_call's

@@ -1,25 +1,22 @@
 """
 app.py — Streamlit entrypoint. Two tabs: Chat (single-model, Qwen2.5:3b) and
-Trip Review (reads/writes family_db.json directly, no model call needed for
-simple edits).
+Trip Review (reads/writes MongoDB Atlas via crud.py, no local JSON file).
 
 Run: streamlit run app.py
 Requires Ollama running locally with the active model pulled
-(default: qwen2.5:3b — override via FAMILY_AGENT_MODEL env var).
+(default: qwen2.5:3b — override via FAMILY_AGENT_MODEL env var), and
+MONGO_URI set — see .env.example / secrets.toml.template.
 """
 
-import json
 import re
-from datetime import date, datetime
 
 import streamlit as st
 
+import crud
 from prompts import build_qwen_system_prompt
 # from prompts import build_llama_system_prompt  # dual-model mode only — see router.py
 from router import route_and_call
 from tools import search_flights, search_web, TOOL_REGISTRY
-
-DB_PATH = "family_db.json"
 
 # Lightweight "already been there" detector for automatic travel-history
 # logging. Not NLP-robust — it catches the phrasings this family actually
@@ -82,26 +79,19 @@ FLIGHT_TOOL_SCHEMA = [{
 
 
 def load_db() -> dict:
-    with open(DB_PATH, "r", encoding="utf-8") as f:
-        return json.load(f)
-
-
-def save_db(db: dict) -> None:
-    db["last_updated"] = datetime.now().isoformat(timespec="seconds")
-    with open(DB_PATH, "w", encoding="utf-8") as f:
-        json.dump(db, f, indent=2, ensure_ascii=False)
+    return crud.get_full_context_db()
 
 
 def detect_and_log_visited_places(user_text: str, db: dict) -> list[str]:
     """
-    Scans user_text for explicit "already been there" mentions and appends
-    any new ones to db['regional_travel_history']['visited_regions'], saving
-    to disk immediately so the next system prompt build (including this
-    turn's, since this runs before build_qwen_system_prompt below) reflects
-    them as lower-priority per the existing soft-guidance rules.
+    Scans user_text for explicit "already been there" mentions and, for
+    each new one, writes it to MongoDB via crud.add_visited_region AND
+    mutates the in-memory `db` dict for this turn — the write makes it
+    durable, the in-memory mutation means this turn's system prompt (built
+    right after this call) reflects it immediately rather than waiting on
+    the cache TTL or the next rerun's re-fetch.
     """
-    history = db.setdefault("regional_travel_history", {"visited_regions": [], "priority_hierarchy": {}})
-    visited = history.setdefault("visited_regions", [])
+    visited = db.setdefault("regional_travel_history", {}).setdefault("visited_regions", [])
     existing_lower = {v.lower() for v in visited}
 
     newly_logged = []
@@ -109,12 +99,11 @@ def detect_and_log_visited_places(user_text: str, db: dict) -> list[str]:
         for raw in pattern.findall(user_text):
             place = _clean_place(raw)
             if place and place.lower() not in existing_lower:
-                visited.append(place)
-                existing_lower.add(place.lower())
-                newly_logged.append(place)
+                if crud.add_visited_region(place):
+                    visited.append(place)
+                    existing_lower.add(place.lower())
+                    newly_logged.append(place)
 
-    if newly_logged:
-        save_db(db)
     return newly_logged
 
 
@@ -244,7 +233,7 @@ with tab_review:
         cost = st.number_input("Estimated cost (USD)", min_value=0, step=100)
         decision = st.selectbox("Decision", ["approved", "rejected", "needs_review"])
         note = st.text_area("Notes")
-        submitted = st.form_submit_button("Save to family_db.json")
+        submitted = st.form_submit_button("Save to MongoDB")
 
     if submitted and dest:
         entry = {
@@ -252,14 +241,10 @@ with tab_review:
             "estimated_cost_usd": cost,
             "decision": decision,
             "notes": note,
-            "logged_on": str(date.today()),
         }
-        if decision == "needs_review":
-            db["pending_reviews"].append(entry)
-        else:
-            db["trip_history"].append(entry)
-        save_db(db)
-        st.success(f"Saved {dest} to family_db.json ({decision}).")
+        entry_type = "pending_review" if decision == "needs_review" else "trip_history"
+        crud.add_ledger_entry(entry_type, entry)
+        st.success(f"Saved {dest} to MongoDB ({decision}).")
 
     st.divider()
     st.write("Visited cities")
